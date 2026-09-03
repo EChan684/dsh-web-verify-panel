@@ -1,89 +1,85 @@
 # dsh-web-verify-panel
 
-把 agent 的「打开网页做可视化验证」请求路由进 **DSH 窗口右侧栏的内嵌浏览器**（依赖已启用的
-[dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)），不再弹出系统浏览器遮挡会话界面。
+将 agent 的网页打开请求路由至 DSH 窗口右侧栏的内置浏览器面板（dsh-better-sidebar），替代系统浏览器打开，使 `computer_screenshot` 可以配合 `region` 参数直接截取页面区域。
 
-## 与同类项目的差异（为什么还需要这个插件）
+## 特性
 
-| 项目 | 定位 | 与本文的差异 |
-|---|---|---|
-| 官方 `dsh-tool-web`（web_search / web_fetch） | 文本抓取 | **无可视化**：不能截图、无页面渲染；且当前部署下 `web_fetch` 默认未启用 |
-| [dsh-web-preview-panel](https://github.com/zoumutou/dsh-web-preview)（npm `dsh-web-preview-panel`） | 侧边网页**预览面板**（人用） | 自建 React 面板，服务"开发者预览本地项目/文件/批注"，**没有 agent 工具**、没有验证截图流程 |
-| [Nono-neko/dsh-browser](https://github.com/Nono-neko/dsh-browser) | Puppeteer 仿真浏览器 + `browser_open/browser_read` | 需要额外 Chromium 进程，是"agent 操控浏览器"而非"展示验证" |
-| [Lum1104/dsh-browser](https://github.com/Lum1104/dsh-browser) | Chrome 侧边栏扩展 | 操控**系统真实浏览器**，不显示在 DSH 窗口内 |
-| **本插件** | **agent 网页可视化验证闭环** | `web_verify_open` → 右侧栏打开 + 自动加宽 → 返回 `rect` → `computer_screenshot` 只截页面区域；会话首轮即可用，强规则防止模型改用系统浏览器 |
-
-**官方 DSH 没有内置浏览器面板**（网页端无 iframe/浏览器组件，仅有文本类 web 工具），此功能必须由插件提供——本插件是唯一把"模型发起 → 页面打开 → 区域截图 → 防旁路"做成完整闭环的轻量实现（不跑额外浏览器进程，复用 better-sidebar 面板）。
-
-- 页面显示在 DSH 窗口内，`computer_screenshot` 的 `region` 只截页面区域，验证流程不再被打断、不再截整屏。
-- 打开页面时**临时加宽面板**（约 60% 视口 / 上限 1600px，60 秒后恢复，不改动你的持久设置，你拖拽时自动让路），桌面页面不再被窄栏挤压而丢失重要信息。
-- **会话首轮即可使用**：自动为默认的 Router Standard 预设打补丁，让 `web_verify_open` 进入首轮核心工具集，模型一收到"打开网页"请求就直接调用它，不再犹豫、不再换用系统浏览器。
+- 注册 `web_verify_open(url, title?)` agent 工具，返回打开状态与页面区域矩形 `rect`
+- `rect` 可直接作为 `computer_screenshot` 的 `region` 参数，只截页面区域，不截整屏
+- 打开验证页面时临时加宽面板至视口约 60%（上限 1600px），60 秒后恢复；用户拖拽优先，不修改持久设置
+- 自动为 Router Standard 预设打补丁，使 `web_verify_open` 进入会话首轮核心工具集
+- system prompt（order=3）与工具描述明确唯一允许方式，并列出被禁止的替代手段（Start-Process / cmd start / explorer / msedge / chrome / firefox / Invoke-WebRequest / Python webbrowser）
 
 ## 安装
 
-前置：DSH 桌面端（v5.x，Node ≥ 18）、已启用 `dsh-better-sidebar`（侧边卡片浏览器是内置功能，默认就可用）。
+前置：DSH 桌面端或网页端 v5.x、Node ≥ 18、dsh-better-sidebar（侧边卡片浏览器，默认启用）。
 
-```sh
-# 1. 拷贝插件到 profile 的 node_modules（Windows PowerShell）
+```powershell
+# 1. 拷贝插件到 profile 的 node_modules
 Copy-Item -Recurse -Force dsh-web-verify-panel "$env:USERPROFILE\.dsh\profiles\web-desktop\node_modules\"
 
-# 2. 在 ~/.dsh/profiles/web-desktop/cordis.patch.yml 末尾追加挂载行
+# 2. 在 cordis.patch.yml 末尾追加挂载块
 #    - insert:
 #        - id: web-verify-panel
 #          name: 'dsh-web-verify-panel'
 
-# 3. 为 Router Standard 预设打补丁（幂等，可重复运行；一次重启即可生效）
+# 3. 为 Router Standard 预设打补丁（幂等；跳过则插件启动时自动补丁，需再重启一次）
 node "$env:USERPROFILE\.dsh\profiles\web-desktop\node_modules\dsh-web-verify-panel\scripts\patch-router-preset.mjs"
 
-# 4. 重启 DSH 桌面端（硬刷新 Web 界面 Ctrl+Shift+R 让 client 半加载）
+# 4. 重启 DSH 桌面端并硬刷新 Web 界面（Ctrl+Shift+R）
 ```
 
-> 第 3 步可以跳过：插件启动时会**自动**做同样的补丁（无感、幂等、带备份），只是那样需要第二次重启才生效。
-> 未使用 Router Standard 预设时，补丁自动跳过，无任何影响。
+## 工作原理
 
-## 功能与行为
-
-| 行为 | 说明 |
-|---|---|
-| `web_verify_open(url, title?)` | 把 http/https 网页打开到 DSH 右侧栏内置浏览器，返回 `{ opened, rect }` |
-| `rect` | 页面区域在窗口内的 0..1 分数矩形，模型用它作为 `computer_screenshot` 的 `region` 参数**只截页面** |
-| 临时加宽 | 打开验证页时把面板临时调到约 60% 视口（上限 1600px），60 秒后恢复原宽，不写配置 |
-| 优先级 | 工具描述 + system prompt（顺序 = 3，紧跟 persona 之后）明确"唯一允许方式"，并列出所有被禁止的替代（Start-Process / cmd start / explorer / msedge / chrome / firefox / Invoke-WebRequest / Python webbrowser） |
-| 首轮可用 | Router Standard 预设的首轮核心工具集包含 `web_verify_open`（spec/mixed/react 三档）；打开网页后工具集自动放开为全量，可继续截图验证 |
-| 幂等补丁 | `lib/router-preset.mjs` 只改字符串、只备份一次（`*.bak-webverify`）、已打过则跳过；预设文件改版后匹配不到模式就静默跳过，绝不破坏你的预设 |
-
-## 卸载
-
-1. 从 `~/.dsh/profiles/web-desktop/cordis.patch.yml` 删除 `id: web-verify-panel` 那组 `- insert:` 块；
-2. 删除 `~/.dsh/profiles/web-desktop/node_modules/dsh-web-verify-panel/`；
-3. 想还原预设：把 `.agent-presets/router-standard/router-core.mjs.bak-webverify` 与 `router-bootstrap.mjs.bak-webverify` 改回原名覆盖即可；
-4. 重启桌面端。
-
-## 开发 / 测试
-
-```sh
-npm test        # smoke(7) + trojan(插件安全模式检查) + preset-patch(5)
-node scripts/patch-router-preset.mjs   # 单独运行预设补丁
-```
+- **host 半**（`lib/index.js`）：注册 `web_verify_open` 工具、三条仅回环 HTTP 路由（`/open`、`/poll`、`/ack`）与 system prompt 规则
+- **client 半**（`lib/client.js`）：每 1.5 秒轮询队列，调用 better-sidebar 的 `openTab` 打开浏览器标签，定位页面 iframe 并回传窗口内分数矩形，同时临时加宽面板
+- **预设补丁**（`lib/router-preset.mjs`）：向 Router Standard 预设注入 `web_verify_open`（首轮核心集）与"打开网页直接调用"规则；幂等、带备份、无匹配时静默跳过
 
 ## 兼容性
 
-- **工具注册**：按新版本 `@deepseek-ai/dsh-tools` 的要求声明 `output { schema, render }`；旧版本不认识该字段时会忽略，注册照常。
-- **服务注入**：`webServer / tools / systemPrompt` 全部为可选注入（`apply()` 永不抛错），任何一项缺失/降级都不影响其他部分。
-- **better-sidebar**：缺失时 host 端工具照常注册（返回 `opened:false` 提示），client 半完全静默空转。
-- **老版本 webServer**：路由注册冲突会自动删除旧注册后重试一次；仍失败则静默跳过（路由不可用时工具返回超时提示）。
-- **Router 预设**：仅当用户目录存在 `router-standard` 且内容与已知模式匹配时才会补丁；其他预设/最新预设版本不受影响。
+| 场景 | 打开网页 / rect | 截图验证 |
+|---|---|---|
+| Windows 桌面端 | 支持 | 支持 |
+| macOS / Linux 桌面端 | 支持 | 需平台侧 computer-use 支持（官方 computer-user 目前仅 Windows） |
+| 网页版（同机浏览器访问） | 支持 | 支持（本机截屏） |
+| 网页版（远程 / 无头） | 支持（面板内人工查看） | 不支持（回退 web_search 并如实说明） |
+
+- 工具注册已按新版 `@deepseek-ai/dsh-tools` 要求声明 `output { schema, render }`；旧版本忽略该字段
+- `webServer`、`tools`、`systemPrompt` 均为可选注入，任一缺失只降级不阻塞
+- better-sidebar 未安装时工具仍注册，`web_verify_open` 返回 `opened: false` 提示
+- Router 预设补丁仅匹配已知字符串模式，未命中则跳过，不影响其他预设
 
 ## 已知限制
 
-- 面板以**沙箱 iframe** 渲染页面：被 `X-Frame-Options` / `frame-ancestors` 拒绝的站点显示空白，此时工具返回估计区域并提示改用 `web_search` 或如实告知用户；沙箱内页面与系统浏览器不共享登录态/Cookie。
-- `rect` 分数相对于 **DSH 窗口**：窗口占满屏幕时即屏幕分数；多显示器 / 非全屏时按提示先整屏截一张定位。
-- 若页面打开在**底部面板**（bottom split）而非右侧栏：只回传区域、不调宽（不影响截图）。
-- 面板加宽为纯 DOM 临时调整：60 秒后自动恢复；期间你手动拖拽则立即让路（不会与你的拖拽打架）。
-- 首次安装后预设补丁需要**重启 DSH** 才被 host 加载（预设模块按进程缓存），属预期行为。
+- 面板以沙箱 iframe 渲染，被 `X-Frame-Options` / `frame-ancestors` 拒绝的站点显示空白；沙箱内不共享系统浏览器登录态与 Cookie
+- `rect` 分数相对于 DSH 窗口；窗口非全屏或有多显示器时，需先整屏截图定位
+- 面板加宽为临时 DOM 调整，60 秒后恢复；页面落在底部面板（bottom split）时只回传区域、不调宽
+- 首次安装后预设补丁需重启 DSH 才被宿主加载（预设模块按进程缓存）
 
-## 原理速览
+## 卸载
 
-- **host 半**（`lib/index.js`）：注册 `web_verify_open` 工具 + 三条仅回环路由（`/open` `/poll` `/ack`）+ 强规则 system prompt（order=3）。
-- **client 半**（`lib/client.js`）：1.5 秒轮询队列 → `betterSidebar.openTab({ type:'browser', url })` → 定位 iframe 回传 `rect` 并临时加宽面板。
-- **预设补丁**（`lib/router-preset.mjs`）：把 `web_verify_open` 注入 Router Standard 的首轮核心工具集与路由引导，让"打开网页=直接调用"成为模型的默认行为。
+1. 删除 `cordis.patch.yml` 中 `id: web-verify-panel` 的挂载块
+2. 删除 `node_modules/dsh-web-verify-panel/`
+3. 如需还原预设：用 `*.bak-webverify` 备份覆盖原文件后删除备份
+4. 重启 DSH
+
+## 开发与测试
+
+```powershell
+npm test   # smoke(7) + trojan 安全扫描 + preset-patch(5)
+node scripts/patch-router-preset.mjs
+```
+
+## 生态定位
+
+官方 DSH 未内置浏览器面板（网页端仅有文本类 web 工具），此能力由插件提供。同类项目：
+
+- [dsh-web-preview-panel](https://github.com/zoumutou/dsh-web-preview)（npm `dsh-web-preview-panel`）：面向开发者的侧边预览面板，无 agent 工具
+- [dsh-browser](https://github.com/Nono-neko/dsh-browser)（Nono-neko）：Puppeteer 驱动的浏览器操作工具，需要额外 Chromium 进程
+- [dsh-browser](https://github.com/Lum1104/dsh-browser)（Lum1104）：Chrome 侧边栏扩展，操作系统真实浏览器
+
+本插件聚焦 agent 可视化验证闭环：打开 → 加宽 → rect 区域截图 → 防止旁路打开系统浏览器。
+
+## License
+
+MIT
