@@ -12,7 +12,7 @@
 
 ## 安装
 
-前置：DSH 桌面端或网页端 v5.x、Node ≥ 18、dsh-better-sidebar（侧边卡片浏览器，默认启用）。
+前置：dsh-better-sidebar（侧边卡片浏览器，默认启用）。
 
 ```powershell
 # 1. 拷贝插件到 profile 的 node_modules
@@ -26,14 +26,8 @@ Copy-Item -Recurse -Force dsh-web-verify-panel "$env:USERPROFILE\.dsh\profiles\w
 # 3. 为 Router Standard 预设打补丁（幂等；跳过则插件启动时自动补丁，需再重启一次）
 node "$env:USERPROFILE\.dsh\profiles\web-desktop\node_modules\dsh-web-verify-panel\scripts\patch-router-preset.mjs"
 
-# 4. 重启 DSH 桌面端并硬刷新 Web 界面（Ctrl+Shift+R）
+# 4. 重启 DSH 并硬刷新 Web 界面（Ctrl+Shift+R）
 ```
-
-## 工作原理
-
-- **host 半**（`lib/index.js`）：注册 `web_verify_open` 工具、三条仅回环 HTTP 路由（`/open`、`/poll`、`/ack`）与 system prompt 规则
-- **client 半**（`lib/client.js`）：每 1.5 秒轮询队列，调用 better-sidebar 的 `openTab` 打开浏览器标签，定位页面 iframe 并回传窗口内分数矩形，同时临时加宽面板
-- **预设补丁**（`lib/router-preset.mjs`）：向 Router Standard 预设注入 `web_verify_open`（首轮核心集）与"打开网页直接调用"规则；幂等、带备份、无匹配时静默跳过
 
 ## 兼容性
 
@@ -44,8 +38,6 @@ node "$env:USERPROFILE\.dsh\profiles\web-desktop\node_modules\dsh-web-verify-pan
 | 网页版（同机浏览器访问） | 支持 | 支持（本机截屏） |
 | 网页版（远程 / 无头） | 支持（面板内人工查看） | 不支持（回退 web_search 并如实说明） |
 
-- 工具注册已按新版 `@deepseek-ai/dsh-tools` 要求声明 `output { schema, render }`；旧版本忽略该字段
-- `webServer`、`tools`、`systemPrompt` 均为可选注入，任一缺失只降级不阻塞
 - better-sidebar 未安装时工具仍注册，`web_verify_open` 返回 `opened: false` 提示
 - Router 预设补丁仅匹配已知字符串模式，未命中则跳过，不影响其他预设
 
