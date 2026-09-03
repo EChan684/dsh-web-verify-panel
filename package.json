@@ -1,0 +1,46 @@
+{
+  "name": "dsh-web-verify-panel",
+  "version": "1.0.1",
+  "description": "把 agent 的网页验证请求路由进 DSH 窗口右侧栏的内嵌浏览器（dsh-better-sidebar），不再打开系统浏览器遮挡会话界面；自动加宽面板、只截页面区域、并在会话首轮开放工具",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./router-preset": "./lib/router-preset.mjs",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "scripts",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test/smoke.mjs && node test/trojan-patterns.mjs && node test/preset-patch.test.mjs",
+    "patch-router-preset": "node scripts/patch-router-preset.mjs"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "web-preview",
+    "browser",
+    "sidebar",
+    "web-verify"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  }
+}

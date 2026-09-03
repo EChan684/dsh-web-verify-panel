@@ -1,0 +1,3 @@
+- insert:
+    - id: web-verify-panel
+      name: 'dsh-web-verify-panel'
