@@ -1,6 +1,8 @@
 # dsh-web-verify-panel
 
-让 agent 的网页打开请求在 DSH 侧边栏内完成，而不是弹出系统浏览器窗口。
+让 agent 的网页打开请求在 DSH 侧边栏内完成，不用弹出系统浏览器窗口。
+
+> 依赖前置插件 [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)（侧边卡片浏览器，默认启用）。
 
 ## 优点
 
@@ -17,8 +19,6 @@
 - 面板为沙箱 iframe 渲染，不共享系统浏览器登录态
 
 ## 安装
-
-前置：dsh-better-sidebar（默认启用）。
 
 ```powershell
 Copy-Item -Recurse -Force dsh-web-verify-panel "$env:USERPROFILE\.dsh\profiles\web-desktop\node_modules\"
