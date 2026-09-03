@@ -3,6 +3,18 @@
 把 agent 的「打开网页做可视化验证」请求路由进 **DSH 窗口右侧栏的内嵌浏览器**（依赖已启用的
 [dsh-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)），不再弹出系统浏览器遮挡会话界面。
 
+## 与同类项目的差异（为什么还需要这个插件）
+
+| 项目 | 定位 | 与本文的差异 |
+|---|---|---|
+| 官方 `dsh-tool-web`（web_search / web_fetch） | 文本抓取 | **无可视化**：不能截图、无页面渲染；且当前部署下 `web_fetch` 默认未启用 |
+| [dsh-web-preview-panel](https://github.com/zoumutou/dsh-web-preview)（npm `dsh-web-preview-panel`） | 侧边网页**预览面板**（人用） | 自建 React 面板，服务"开发者预览本地项目/文件/批注"，**没有 agent 工具**、没有验证截图流程 |
+| [Nono-neko/dsh-browser](https://github.com/Nono-neko/dsh-browser) | Puppeteer 仿真浏览器 + `browser_open/browser_read` | 需要额外 Chromium 进程，是"agent 操控浏览器"而非"展示验证" |
+| [Lum1104/dsh-browser](https://github.com/Lum1104/dsh-browser) | Chrome 侧边栏扩展 | 操控**系统真实浏览器**，不显示在 DSH 窗口内 |
+| **本插件** | **agent 网页可视化验证闭环** | `web_verify_open` → 右侧栏打开 + 自动加宽 → 返回 `rect` → `computer_screenshot` 只截页面区域；会话首轮即可用，强规则防止模型改用系统浏览器 |
+
+**官方 DSH 没有内置浏览器面板**（网页端无 iframe/浏览器组件，仅有文本类 web 工具），此功能必须由插件提供——本插件是唯一把"模型发起 → 页面打开 → 区域截图 → 防旁路"做成完整闭环的轻量实现（不跑额外浏览器进程，复用 better-sidebar 面板）。
+
 - 页面显示在 DSH 窗口内，`computer_screenshot` 的 `region` 只截页面区域，验证流程不再被打断、不再截整屏。
 - 打开页面时**临时加宽面板**（约 60% 视口 / 上限 1600px，60 秒后恢复，不改动你的持久设置，你拖拽时自动让路），桌面页面不再被窄栏挤压而丢失重要信息。
 - **会话首轮即可使用**：自动为默认的 Router Standard 预设打补丁，让 `web_verify_open` 进入首轮核心工具集，模型一收到"打开网页"请求就直接调用它，不再犹豫、不再换用系统浏览器。
