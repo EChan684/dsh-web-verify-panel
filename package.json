@@ -34,6 +34,14 @@
   "engines": {
     "node": ">=18"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZFJS684/dsh-web-verify-panel.git"
+  },
+  "homepage": "https://github.com/ZFJS684/dsh-web-verify-panel#readme",
+  "bugs": {
+    "url": "https://github.com/ZFJS684/dsh-web-verify-panel/issues"
+  },
   "license": "MIT",
   "dsh": {
     "bundle": {
